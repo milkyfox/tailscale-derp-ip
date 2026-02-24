@@ -1,0 +1,18 @@
+services:
+  tailscale-derp:
+    image: tailscale-derp:latest
+    container_name: tailscale-derp
+    restart: always
+    network_mode: "host"
+    privileged: true
+    environment:
+      - TAILSCALE_AUTH_KEY=tskey-auth-xxx
+      - TAILSCALE_HOSTNAME=
+      - DERP_IP=
+      - DERP_PORT=
+      - STUN_PORT=
+      - TAILSCALE_PORT=
+    volumes:
+      - ./data/state:/var/lib/tailscale
+      - ./data/certs:/app/certs
+      - /dev/net/tun:/dev/net/tun
