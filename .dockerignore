@@ -1,0 +1,7 @@
+.git/
+.omo/
+data/
+*.md
+!README.md
+start.sh
+.github/
