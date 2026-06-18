@@ -6,13 +6,30 @@ services:
     network_mode: "host"
     privileged: true
     environment:
-      - TAILSCALE_AUTH_KEY=tskey-auth-xxx
-      - TAILSCALE_HOSTNAME=
-      - DERP_IP=
-      - DERP_PORT=
-      - STUN_PORT=
-      - TAILSCALE_PORT=
+      - TAILSCALE_AUTH_KEY=${TAILSCALE_AUTH_KEY:-}
+      - TAILSCALE_HOSTNAME=${TAILSCALE_HOSTNAME:-}
+      - DERP_IP=${DERP_IP:-}
+      - DERP_PORT=${DERP_PORT:-443}
+      - STUN_PORT=${STUN_PORT:-3478}
+      - TAILSCALE_PORT=${TAILSCALE_PORT:-41641}
+      - RELAY_SERVER_PORT=${RELAY_SERVER_PORT:-}
+      - RELAY_STATIC_ENDPOINTS=${RELAY_STATIC_ENDPOINTS:-}
+      - ENABLE_EXIT_NODE=${ENABLE_EXIT_NODE:-true}
+    healthcheck:
+      test: ["CMD", "tailscale", "--socket=/var/run/tailscale/tailscaled.sock", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./data/state:/var/lib/tailscale
       - ./data/certs:/app/certs
       - /dev/net/tun:/dev/net/tun
+    # 宿主机 Socket 代理模式：挂载宿主机 tailscaled socket，容器将自动检测并跳过内部 tailscaled
+    # 使用此模式时，可以移除 privileged: true，改用 cap_add
+    # - /var/run/tailscale:/var/run/tailscale:ro
