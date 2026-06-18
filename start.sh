@@ -58,6 +58,8 @@ fi
 
 DERP_PORT=$(grep 'DERP_PORT=' docker-compose.yml | cut -d= -f2 | tr -d ' ' || echo 443)
 STUN_PORT=$(grep 'STUN_PORT=' docker-compose.yml | cut -d= -f2 | tr -d ' ' || echo 3478)
+RELAY_SERVER_PORT=$(grep -oP 'RELAY_SERVER_PORT=\$\{RELAY_SERVER_PORT:-\K[^}]*' docker-compose.yml | tr -d ' ')
+ENABLE_EXIT_NODE=$(grep 'ENABLE_EXIT_NODE=' docker-compose.yml | head -1 | cut -d= -f2 | tr -d ' ' | tr -d '"')
 
 if [ -n "$FOUND_CERT" ]; then
     echo -e "${GREEN}===========================================${RESET}"
@@ -85,4 +87,27 @@ else
     echo -e "${RED}Failed to automatically extract CertName from logs.${RESET}"
     echo -e "${YELLOW}Please manually run the following command to check log content:${RESET}"
     echo "docker compose logs --tail=50"
+fi
+
+if [ -n "$RELAY_SERVER_PORT" ]; then
+    echo ""
+    echo -e "${GREEN}===========================================${RESET}"
+    echo -e "${GREEN}   Peer Relay Configuration                 ${RESET}"
+    echo -e "${GREEN}===========================================${RESET}"
+    echo -e "Peer Relay Port:     ${YELLOW}${RELAY_SERVER_PORT}${RESET}"
+    echo ""
+    echo -e "${BLUE}Please add the following JSON to the grants section of Tailscale ACL:${RESET}"
+    echo -e "${YELLOW}"
+    echo "{"
+    echo "  \"grants\": [{"
+    echo "    \"src\": [\"tag:relay-clients\"],"
+    echo "    \"dst\": [\"tag:relay\"],"
+    echo "    \"app\": {\"tailscale.com/cap/relay\": [{}]}"
+    echo "  }]"
+    echo "}"
+    echo -e "${RESET}"
+    echo -e "${BLUE}Notes:${RESET}"
+    echo -e "${BLUE}- Peer relay node should have tag:relay${RESET}"
+    echo -e "${BLUE}- Client nodes should have tag:relay-clients${RESET}"
+    echo -e "${BLUE}- All devices require Tailscale >= 1.86${RESET}"
 fi
