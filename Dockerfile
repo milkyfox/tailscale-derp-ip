@@ -30,7 +30,7 @@ ENV DERP_PORT=443 \
     STUN_PORT=3478
 
 LABEL org.opencontainers.image.title="tailscale-derp-ip" \
-      org.opencontainers.image.source="https://github.com/yucha/tailscale-derp-ip" \
+      org.opencontainers.image.source="https://github.com/milkyfox/tailscale-derp-ip" \
       org.opencontainers.image.description="Tailscale DERP Server + Exit Node Docker Image" \
       org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.licenses="MIT"
