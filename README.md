@@ -40,6 +40,24 @@ services:
       - /dev/net/tun:/dev/net/tun
       # - /var/run/tailscale:/var/run/tailscale:ro  # Socket 代理模式（可选）
 ```
+## 获取镜像
+
+### 方式 1：从 GitHub Container Registry 拉取
+```bash
+docker pull ghcr.io/milkyfox/tailscale-derp-ip:latest
+docker tag ghcr.io/milkyfox/tailscale-derp-ip:latest tailscale-derp:latest
+```
+
+### 方式 2：本地编译
+```bash
+./build-export.sh --local
+```
+
+### 方式 3：加载导出的镜像
+```bash
+./load-image.sh
+```
+
 ### 配置环境变量
 
 编辑 `docker-compose.yml`，填写以下环境变量：
