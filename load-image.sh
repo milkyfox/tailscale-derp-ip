@@ -47,6 +47,10 @@ EOF
 while [[ $# -gt 0 ]]; do
     case $1 in
         --arch)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                log_err "--arch 需要参数 (amd64|arm64)"
+                exit 1
+            fi
             ARCH="$2"
             shift 2
             ;;
@@ -91,8 +95,8 @@ if ! command -v docker &>/dev/null; then
     exit 1
 fi
 
-if ! docker info &>/dev/null; then
-    log_err "Docker 守护进程未运行，请先启动 Docker"
+if ! timeout 5 docker info &>/dev/null; then
+    log_err "Docker 守护进程未运行或未响应"
     exit 1
 fi
 
