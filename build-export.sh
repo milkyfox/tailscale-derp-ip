@@ -16,7 +16,8 @@ log_err()    { echo -e "${RED}[ERROR]${RESET} $1"; }
 # --- Defaults ---
 ARCHS="amd64 arm64"
 TAG="latest"
-IMAGE_NAME="ghcr.io/yucha/tailscale-derp-ip"
+IMAGE_NAME="ghcr.io/milkyfox/tailscale-derp-ip"
+LOCAL_MODE=false
 
 # --- Help ---
 show_help() {
@@ -26,11 +27,13 @@ show_help() {
 选项:
   --arch <arch>   只拉取指定架构 (amd64|arm64)，默认两个都拉
   --tag <tag>     拉取的镜像标签，默认 latest
+  --local         本地编译模式：docker build 后导出，只编译当前架构
   --help          显示此帮助
 
 说明:
   从 ghcr.io 拉取 GitHub Actions 已构建的多架构镜像，导出为 tar 文件。
   国内用户可直接 docker load 使用，无需本地编译。
+  使用 --local 可在本地 docker build 编译后导出（不需要网络）。
 EOF
     exit 0
 }
@@ -46,6 +49,10 @@ while [[ $# -gt 0 ]]; do
             TAG="$2"
             shift 2
             ;;
+        --local)
+            LOCAL_MODE=true
+            shift
+            ;;
         --help)
             show_help
             ;;
@@ -55,6 +62,15 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# --- Detect local arch ---
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64)  echo "amd64" ;;
+        aarch64|arm64) echo "arm64" ;;
+        *) log_err "无法识别的架构: $(uname -m)"; exit 1 ;;
+    esac
+}
 
 # --- Validate arch values ---
 for arch in $ARCHS; do
@@ -82,27 +98,39 @@ fi
 mkdir -p dist
 
 # --- Export for each architecture ---
-for arch in $ARCHS; do
-    log_info "拉取 ${arch} 镜像..."
-    docker pull --platform "linux/${arch}" "${IMAGE_NAME}:${TAG}"
+if [ "$LOCAL_MODE" = "true" ]; then
+    ARCH=$(detect_arch)
+    log_info "本地编译 ${ARCH} 架构镜像..."
+    docker build -t "tailscale-derp:latest-${ARCH}" .
+    log_info "导出 ${ARCH} tar 包..."
+    docker save "tailscale-derp:latest-${ARCH}" -o "dist/tailscale-derp-${ARCH}.tar"
+    log_success "完成: dist/tailscale-derp-${ARCH}.tar"
+else
+    for arch in $ARCHS; do
+        log_info "拉取 ${arch} 镜像..."
+        docker pull --platform "linux/${arch}" "${IMAGE_NAME}:${TAG}"
 
-    docker tag "${IMAGE_NAME}:${TAG}" "tailscale-derp:latest-${arch}"
+        docker tag "${IMAGE_NAME}:${TAG}" "tailscale-derp:latest-${arch}"
 
-    log_info "导出 ${arch} tar 包..."
-    docker save "tailscale-derp:latest-${arch}" -o "dist/tailscale-derp-${arch}.tar"
+        log_info "导出 ${arch} tar 包..."
+        docker save "tailscale-derp:latest-${arch}" -o "dist/tailscale-derp-${arch}.tar"
 
-    log_success "完成: dist/tailscale-derp-${arch}.tar"
-done
+        log_success "完成: dist/tailscale-derp-${arch}.tar"
+    done
+fi
 
 # --- Final output ---
 echo ""
 log_success "导出完成！文件列表："
 ls -lh dist/tailscale-derp-*.tar 2>/dev/null || echo "  （无文件导出）"
-echo ""
-echo "国内用户使用步骤："
-echo "  1. 将 tar 文件传输到目标机器"
-for arch in $ARCHS; do
-    echo "  2. docker load -i dist/tailscale-derp-${arch}.tar"
-done
-echo "  3. docker tag tailscale-derp:latest-<arch> tailscale-derp:latest"
-echo "  4. 使用 docker compose up -d 启动（如有 docker-compose.yml）"
+
+if [ "$LOCAL_MODE" != "true" ]; then
+    echo ""
+    echo "国内用户使用步骤："
+    echo "  1. 将 tar 文件传输到目标机器"
+    for arch in $ARCHS; do
+        echo "  2. docker load -i dist/tailscale-derp-${arch}.tar"
+    done
+    echo "  3. docker tag tailscale-derp:latest-<arch> tailscale-derp:latest"
+    echo "  4. 使用 docker compose up -d 启动（如有 docker-compose.yml）"
+fi
