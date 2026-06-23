@@ -1,75 +1,46 @@
-# Tailscale DERP Server + Exit Node
+# Tailscale DERP Server
 
-部署 Tailscale DERP 和 Exit Node 的 Docker 镜像。
+部署 Tailscale DERP（IP）、Exit Node 和 Peer Relay 的 Docker 镜像。
 
-## 功能特性
+## 功能
 
-- 部署 Tailscale DERP server
-- 支持 Exit Node
-
-## 新功能
-
-- **Peer Relay**: 将设备配置为高吞吐量 UDP 中继节点，在直连不可用时优先于 DERP 进行流量中继
-- **Exit Node 开关**: 通过环境变量控制是否启用 Exit Node 功能
-- **宿主机 Socket 代理**: 复用宿主机已运行的 tailscaled 实例，无需在容器内启动 tailscaled
+- DERP         : 自建 Tailscale DERP 中继服务器
+- Peer Relay   : 将设备配置为 UDP 中继节点，在直连不可用时优先于 DERP 进行流量中继
+- Exit Node    : 作为流量出口节点
+- Socket Proxy : 复用宿主机已运行的 tailscaled 实例
 
 ## 使用
-docker-compose.yml
 
-```yaml
-services:
-  tailscale-derp:
-    image: tailscale-derp:latest
-    container_name: tailscale-derp
-    restart: always
-    network_mode: "host"
-    privileged: true
-    environment:
-      - TAILSCALE_AUTH_KEY=tskey-auth-xxx
-      - TAILSCALE_HOSTNAME=
-      - DERP_IP=
-      - DERP_PORT=
-      - STUN_PORT=
-      - TAILSCALE_PORT=
-      - ENABLE_EXIT_NODE=true       # 可选：是否启用 Exit Node
-      - RELAY_SERVER_PORT=          # 可选：Peer Relay UDP 端口（留空不启用）
-      - RELAY_STATIC_ENDPOINTS=     # 可选：Peer Relay 静态端点
-    volumes:
-      - ./data/state:/var/lib/tailscale
-      - ./data/certs:/app/certs
-      - /dev/net/tun:/dev/net/tun
-      # - /var/run/tailscale:/var/run/tailscale:ro  # Socket 代理模式（可选）
-```
-## 获取镜像
+### 获取镜像
 
-### 方式 1：从 GitHub Container Registry 拉取
+- 从 GHRC 拉取
 ```bash
 docker pull ghcr.io/milkyfox/tailscale-derp-ip:latest
 docker tag ghcr.io/milkyfox/tailscale-derp-ip:latest tailscale-derp:latest
 ```
 
-### 方式 2：本地编译
+- 本地编译
 ```bash
 ./build-export.sh --local
+docker tag tailscale-derp:latest-amd64 tailscale-derp:latest
 ```
 
-### 方式 3：加载导出的镜像
+- 加载导出的镜像
 ```bash
 ./load-image.sh
 ```
 
 ### 配置环境变量
 
-编辑 `docker-compose.yml`，填写以下环境变量：
+```bash
+cp .env.example .env
+```
 
-```yaml
-environment:
-  - TAILSCALE_AUTH_KEY=tskey-auth-xxx   # 必填：Tailscale Auth Key
-  - TAILSCALE_HOSTNAME=                 # 可选：Tailscale 机器名称
-  - DERP_IP=                            # 必填：服务器公网 IP
-  - DERP_PORT=443                       # 可选：DERP HTTPS 端口（默认 443）
-  - STUN_PORT=3478                      # 可选：STUN 端口（默认 3478）
-  - TAILSCALE_PORT=41641                # 可选：Tailscale P2P 端口（默认 41641）
+编辑 `.env`，修改以下环境变量，全部环境变量见 `.env.example`。
+
+```bash
+TAILSCALE_AUTH_KEY=tskey-auth-xxx    # Tailscale 认证密钥
+DERP_IP=                             # 服务器公网 IP
 ```
 
 ### 获取 Auth Key
@@ -87,18 +58,19 @@ bash start.sh
 ```
 
 脚本会：
-- 构建并启动容器
+- 启动容器
 - 捕获 CertName
 - 输出需要添加到 Tailscale ACL 的 JSON 配置
 
 ### 配置 Tailscale ACL
 
-将脚本输出的 JSON 添加到 [Tailscale ACL](https://login.tailscale.com/admin/acls) 的 `derpMap` 中：
+将start.sh脚本输出的 JSON 添加到 [Tailscale ACL](https://login.tailscale.com/admin/acls) 的 `derpMap.Regions.{ID}.Nodes` 中：
 
 ```json
 {
   "Name": "custom-node-vps",
   "RegionID": 900,
+  "RegionCode": "custom-derp",
   "HostName": "YOUR_SERVER_IP",
   "CertName": "sha256-raw:YOUR_CERT_HASH",
   "IPv4": "YOUR_SERVER_IP",
@@ -107,33 +79,14 @@ bash start.sh
   "InsecureForTests": true
 }
 ```
+如果 CertName 已正确设置，可将 `InsecureForTests` 设为 `false`。
 
-## 环境变量说明
-
-| 变量 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `TAILSCALE_AUTH_KEY` | ✅ | - | Tailscale 认证密钥 |
-| `TAILSCALE_HOSTNAME` | ❌ | derp-{DERP_IP} | Tailscale 网络中的主机名 |
-| `DERP_IP` | ✅ | - | 服务器公网 IP 或域名 |
-| `DERP_PORT` | ❌ | 443 | DERP HTTPS 服务端口 |
-| `STUN_PORT` | ❌ | 3478 | STUN 服务端口 |
-| `TAILSCALE_PORT` | ❌ | 41641 | Tailscale P2P 通信端口 |
-| `RELAY_SERVER_PORT` | ❌ | - | Peer Relay UDP 端口（如 40000），留空则不启用 |
-| `RELAY_STATIC_ENDPOINTS` | ❌ | - | Peer Relay 静态端点（逗号分隔 ip:port） |
-| `ENABLE_EXIT_NODE` | ❌ | true | 是否启用 Exit Node（true/false） |
-
-## Peer Relay 功能
-
-Tailscale Peer Relay 允许将设备配置为高吞吐量的 UDP 中继节点，在直连不可用时优先于 DERP 进行流量中继。
+## Peer Relay
 
 ### 启用 Peer Relay
 
-设置 `RELAY_SERVER_PORT` 环境变量来启用 Peer Relay：
-
-```yaml
-environment:
-  - RELAY_SERVER_PORT=40000
-```
+在 .env 中设置 RELAY_SERVER_PORT 启用。静态端点通过 RELAY_STATIC_ENDPOINTS 配置，格式 ip:port,ip:port。
+所有设备需要 Tailscale >= 1.86。
 
 ### ACL 配置
 
@@ -144,56 +97,49 @@ environment:
   "grants": [{
     "src": ["tag:relay-clients"],
     "dst": ["tag:relay"],
-    "app": {"tailscale.com/cap/relay": [{}]}
+    "app": {"tailscale.com/cap/relay": []}
   }]
 }
 ```
 
-> **注意**：
-> - Peer Relay 节点需要打 `tag:relay` 标签，客户端节点需要打 `tag:relay-clients` 标签
-> - 所有设备需要 Tailscale >= 1.86
-> - Peer Relay 与 Exit Node 可以独立启用
+Peer Relay 节点需要打 `tag:relay` 标签，客户端节点需要打 `tag:relay-clients` 标签，也可以允许所有节点：
 
-### 静态端点（可选）
-
-```yaml
-environment:
-  - RELAY_SERVER_PORT=40000
-  - RELAY_STATIC_ENDPOINTS=1.2.3.4:40000,5.6.7.8:40000
+```json
+{
+  "grants": [{
+    "src": ["*"],
+    "dst": ["*"],
+    "app": {"tailscale.com/cap/relay": []}
+  }]
+}
 ```
 
-## 宿主机 Socket 代理模式
+## Socket 代理模式
 
-当宿主机已安装并运行 Tailscale 时，容器可以复用宿主机的 tailscaled 实例，无需在容器内启动 tailscaled。
+当宿主机已安装并运行 Tailscale 时，容器可以复用宿主机的 tailscaled 实例。
 
 ### 使用方法
 
-在 `volumes` 中挂载宿主机的 tailscaled socket 目录：
+在现有 compose 文件的 `volumes` 中挂载宿主机的 tailscaled socket 目录：
 
 ```yaml
-volumes:
-  - /var/run/tailscale:/var/run/tailscale:ro
+services:
+  tailscale-derp:
+    image: tailscale-derp:latest
+    volumes:
+      - /var/run/tailscale:/var/run/tailscale:ro
 ```
 
 挂载后，容器会自动检测并切换为 Socket 代理模式：
-- 跳过容器内的 tailscaled 启动
-- 跳过 TUN 设备和 sysctl 配置
+- 跳过容器内的 tailscaled 启动，忽略 `TAILSCALE_AUTH_KEY` 环境变量
 - derper 直接通过宿主机 socket 验证客户端
-- 忽略 `TAILSCALE_AUTH_KEY`（宿主机已认证）
+- Exit Node 和 Peer Relay 由宿主机管理
 
-> **注意**：
-> - 挂载**目录**而非文件，避免 tailscaled 重启后 inode 变化
-> - Socket 模式时 Exit Node 和 Peer Relay 功能由宿主机管理
-> - derper 和宿主机 tailscaled 版本不一致时会输出警告（不阻止启动）
+如果 derper 和宿主机 tailscaled 版本不一致时会输出警告。
 
-### 安全工作模式（可选）
+## 脚本说明
 
-Socket 代理模式下，容器只需运行 derper，可以替换 `privileged: true` 为最小化权限：
-
-```yaml
-# privileged: true  # 不再需要
-cap_add:
-  - NET_BIND_SERVICE
-devices:
-  - /dev/net/tun:/dev/net/tun  # 不再需要，可移除
-```
+| 脚本 | 说明 |
+|------|------|
+| `build-export.sh` | 拉取 ghcr.io 镜像或本地编译，导出 tar。使用 `--local` 本地编译并导出 |
+| `load-image.sh` | 从导出的 tar 文件加载 Docker 镜像到本地环境 |
