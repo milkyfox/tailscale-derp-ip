@@ -26,6 +26,7 @@ FINAL_HOSTNAME=${TAILSCALE_HOSTNAME:-$AUTO_HOSTNAME}
 DERP_PORT=${DERP_PORT:-443}
 STUN_PORT=${STUN_PORT:-3478}
 TAILSCALE_UDP_PORT=${TAILSCALE_PORT:-41641}
+RELAY_SERVER_PORT=${RELAY_SERVER_PORT:-}
 
 
 # Validate required configuration
@@ -38,7 +39,8 @@ fi
 # --- Detect socket proxy mode ---
 SOCKET_MODE=false
 if [ -S /var/run/tailscale/tailscaled.sock ]; then
-    if findmnt /var/run/tailscale > /dev/null 2>&1; then
+    REAL_PATH=$(readlink -f /var/run/tailscale 2>/dev/null || echo "/var/run/tailscale")
+    if grep -qF " ${REAL_PATH} " /proc/mounts 2>/dev/null; then
         SOCKET_MODE=true
         log_info "Detected host tailscale socket mount - running in socket proxy mode"
         log_info "Skipping container tailscaled, using host tailscaled at /var/run/tailscale/tailscaled.sock"
@@ -56,7 +58,11 @@ log_info "Target Address  (DERP_ADDR): ${GREEN}${DERP_ADDR}${RESET}"
 log_info "Hostname         (Hostname): ${GREEN}${FINAL_HOSTNAME}${RESET}"
 log_info "HTTPS Port      (DERP_PORT): ${GREEN}${DERP_PORT}${RESET}"
 log_info "STUN  Port      (STUN_PORT): ${GREEN}${STUN_PORT}${RESET}"
-log_info "P2P   Port (TAILSCALE_PORT): ${GREEN}${TAILSCALE_UDP_PORT}${RESET}"
+
+if [ "${SOCKET_MODE}" != "true" ]; then
+    log_info "P2P   Port (TAILSCALE_PORT): ${GREEN}${TAILSCALE_UDP_PORT}${RESET}"
+    log_info "Relay Port (RELAY_SERVER_PORT): ${GREEN}${RELAY_SERVER_PORT:-not set}${RESET}"
+fi
 
 if [ "${SOCKET_MODE}" = "true" ]; then
     log_info "Socket proxy mode active - DERP server will use host tailscaled for client verification"
@@ -67,8 +73,10 @@ if [ "$SOCKET_MODE" != "true" ]; then
     log_info "Configuring system network parameters..."
 
 
-    echo 'net.ipv4.ip_forward = 1' | tee -a /etc/sysctl.d/99-tailscale.conf > /dev/null
-    echo 'net.ipv6.conf.all.forwarding = 1' | tee -a /etc/sysctl.d/99-tailscale.conf > /dev/null
+    cat > /etc/sysctl.d/99-tailscale.conf <<EOF
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 1
+EOF
     if sysctl -p /etc/sysctl.d/99-tailscale.conf > /dev/null 2>&1; then
         log_success "Kernel IP forwarding enabled"
     else
@@ -96,9 +104,6 @@ if [ "$SOCKET_MODE" != "true" ]; then
         --no-logs-no-support &
 
 
-    TAILSCALED_PID=$!
-
-
     log_info "Waiting for tailscaled socket to be created..."
     for i in {1..30}; do
         if [ -S /var/run/tailscale/tailscaled.sock ]; then
@@ -114,10 +119,12 @@ if [ "$SOCKET_MODE" != "true" ]; then
 
 
     if [ -n "${TAILSCALE_AUTH_KEY}" ]; then
-        log_info "Auth Key detected, logging in to Tailscale and registering Exit Node..."
-        
-        # Read ENABLE_EXIT_NODE (default: true for backward compatibility)
         ENABLE_EXIT_NODE=${ENABLE_EXIT_NODE:-true}
+        if [ "${ENABLE_EXIT_NODE}" = "true" ]; then
+            log_info "Auth Key detected, logging in to Tailscale and registering Exit Node..."
+        else
+            log_info "Auth Key detected, logging in to Tailscale..."
+        fi
         
         UP_ARGS=(
             --reset
@@ -137,7 +144,11 @@ if [ "$SOCKET_MODE" != "true" ]; then
         log_info "Waiting for network connection..."
         for i in {1..20}; do
             if tailscale --socket=/var/run/tailscale/tailscaled.sock status --json | grep -q "BackendState.*Running"; then
-                log_success "Tailscale login successful! Exit Node functionality is ready."
+                if [ "${ENABLE_EXIT_NODE}" = "true" ]; then
+                    log_success "Tailscale login successful! Exit Node functionality is ready."
+                else
+                    log_success "Tailscale login successful!"
+                fi
                 break
             fi
 
@@ -210,6 +221,8 @@ else
     if [ -n "${DERP_VERSION}" ] && [ -n "${CT_TS_VERSION}" ] && [ "${DERP_VERSION}" != "${CT_TS_VERSION}" ]; then
         log_warn "Version mismatch: derper (${DERP_VERSION}) vs container tailscaled (${CT_TS_VERSION})"
         log_warn "--verify-clients may not work correctly."
+    else
+        log_success "Version check passed (derper: ${DERP_VERSION:-?}, tailscaled: ${CT_TS_VERSION:-?})"
     fi
 fi
 
@@ -228,7 +241,7 @@ exec derper \
     --certdir=/app/certs \
     --a=":${DERP_PORT}" \
     --http-port=-1 \
-    --stun-port=${STUN_PORT} \
+    --stun-port="${STUN_PORT}" \
     --verify-clients \
     ${DERP_SOCKET_ARG} \
     --stun
