@@ -113,6 +113,10 @@ if [ "$LOCAL_MODE" = "true" ]; then
     log_info "导出 ${ARCH} tar 包..."
     docker save "tailscale-derp:latest-${ARCH}" -o "dist/tailscale-derp-${ARCH}.tar"
     log_success "完成: dist/tailscale-derp-${ARCH}.tar"
+    echo ""
+    echo "将 tar 文件传输到目标机器后，运行："
+    echo "  ./load-image.sh dist/tailscale-derp-${ARCH}.tar"
+    echo "  bash start.sh"
 else
     for arch in $ARCHS; do
         log_info "拉取 ${arch} 镜像..."
@@ -134,11 +138,9 @@ ls -lh dist/tailscale-derp-*.tar 2>/dev/null || echo "  （无文件导出）"
 
 if [ "$LOCAL_MODE" != "true" ]; then
     echo ""
-    echo "国内用户使用步骤："
-    echo "  1. 将 tar 文件传输到目标机器"
+    echo "将 tar 文件传输到目标机器后，运行："
     for arch in $ARCHS; do
-        echo "  2. docker load -i dist/tailscale-derp-${arch}.tar"
+        echo "  ./load-image.sh dist/tailscale-derp-${arch}.tar"
     done
-    echo "  3. docker tag tailscale-derp:latest-<arch> tailscale-derp:latest"
-    echo "  4. 使用 docker compose up -d 启动（如有 docker-compose.yml）"
+    echo "  bash start.sh"
 fi
