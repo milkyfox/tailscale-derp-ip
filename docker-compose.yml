@@ -16,11 +16,11 @@ services:
       - RELAY_STATIC_ENDPOINTS=${RELAY_STATIC_ENDPOINTS:-}
       - ENABLE_EXIT_NODE=${ENABLE_EXIT_NODE:-true}
     healthcheck:
-      test: ["CMD", "tailscale", "--socket=/var/run/tailscale/tailscaled.sock", "status"]
+      test: ["CMD-SHELL", "curl -kf https://localhost:$${DERP_PORT}/generate_204 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
