@@ -56,8 +56,8 @@ if [ -z "$FOUND_IP" ]; then
     FOUND_IP=$(grep 'DERP_IP=' docker-compose.yml | cut -d= -f2 | tr -d ' ' | tr -d '"' | tr -d "'")
 fi
 
-DERP_PORT=$(grep 'DERP_PORT=' docker-compose.yml | cut -d= -f2 | tr -d ' ' || echo 443)
-STUN_PORT=$(grep 'STUN_PORT=' docker-compose.yml | cut -d= -f2 | tr -d ' ' || echo 3478)
+DERP_PORT=$(grep -oP 'DERP_PORT=\$\{DERP_PORT:-\K[^}]*' docker-compose.yml | tr -d ' ')
+STUN_PORT=$(grep -oP 'STUN_PORT=\$\{STUN_PORT:-\K[^}]*' docker-compose.yml | tr -d ' ')
 RELAY_SERVER_PORT=$(grep -oP 'RELAY_SERVER_PORT=\$\{RELAY_SERVER_PORT:-\K[^}]*' docker-compose.yml | tr -d ' ')
 ENABLE_EXIT_NODE=$(grep 'ENABLE_EXIT_NODE=' docker-compose.yml | head -1 | cut -d= -f2 | tr -d ' ' | tr -d '"')
 
