@@ -223,7 +223,16 @@ else
         log_warn "Version mismatch: derper (${DERP_VERSION}) vs container tailscaled (${CT_TS_VERSION})"
         log_warn "--verify-clients may not work correctly."
     else
-        log_success "Version check passed (derper: ${DERP_VERSION:-?}, tailscaled: ${CT_TS_VERSION:-?})"
+        if [ -n "${DERP_VERSION}" ] && [ -n "${CT_TS_VERSION}" ]; then
+            if [ "${DERP_VERSION}" != "${CT_TS_VERSION}" ]; then
+                log_warn "Version mismatch: derper (${DERP_VERSION}) vs container tailscaled (${CT_TS_VERSION})"
+                log_warn "--verify-clients may not work correctly."
+            else
+                log_success "Version check passed (derper: ${DERP_VERSION}, tailscaled: ${CT_TS_VERSION})"
+            fi
+        else
+            log_warn "Version check incomplete (derper: ${DERP_VERSION:-?}, tailscaled: ${CT_TS_VERSION:-?})"
+        fi
     fi
 fi
 
