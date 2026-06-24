@@ -16,6 +16,7 @@ services:
       - RELAY_SERVER_PORT=${RELAY_SERVER_PORT:-}
       - RELAY_STATIC_ENDPOINTS=${RELAY_STATIC_ENDPOINTS:-}
       - ENABLE_EXIT_NODE=${ENABLE_EXIT_NODE:-true}
+      - VERIFY_CLIENTS=${VERIFY_CLIENTS:-true}
     healthcheck:
       test: ["CMD-SHELL", "curl -kf https://localhost:$${DERP_PORT}/generate_204 || exit 1"]
       interval: 30s

@@ -242,6 +242,12 @@ if [ "${SOCKET_MODE}" = "true" ]; then
     DERP_SOCKET_ARG="--socket=/var/run/tailscale/tailscaled.sock"
 fi
 
+VERIFY_CLIENTS=${VERIFY_CLIENTS:-true}
+VERIFY_CLIENTS_ARG=""
+if [ "${VERIFY_CLIENTS}" = "true" ]; then
+    VERIFY_CLIENTS_ARG="--verify-clients"
+fi
+
 echo -e "\n${GREEN}>>> Starting Derper service... <<<${RESET}"
 
 
@@ -252,6 +258,6 @@ exec derper \
     --a=":${DERP_PORT}" \
     --http-port=-1 \
     --stun-port="${STUN_PORT}" \
-    --verify-clients \
+    ${VERIFY_CLIENTS_ARG} \
     ${DERP_SOCKET_ARG} \
     --stun
