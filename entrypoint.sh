@@ -131,6 +131,7 @@ EOF
             --authkey="${TAILSCALE_AUTH_KEY}"
             --hostname="${FINAL_HOSTNAME}"
             --accept-routes
+            --accept-dns=false
         )
         if [ "${ENABLE_EXIT_NODE}" = "true" ]; then
             UP_ARGS+=(--advertise-exit-node)
