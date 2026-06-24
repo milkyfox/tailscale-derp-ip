@@ -33,10 +33,10 @@ while [ $COUNT -lt $MAX_RETRIES ]; do
     LOGS=$(docker compose logs --tail=200 2>&1)
     RAW_HASH=$(echo "$LOGS" | grep -oE 'sha256-raw:[a-f0-9]+' | tail -n 1)
 
-    DETECTED_IP=$(echo "$LOGS" | grep -oP '"hostName":"\K[^"]+' | tail -1)
-    DETECTED_DERP_PORT=$(echo "$LOGS" | grep -oP 'serving on :\K[0-9]+' | tail -1)
-    DETECTED_STUN_PORT=$(echo "$LOGS" | grep -oP 'STUN server listening on[^:]*:\K[0-9]+' | tail -1)
-    DETECTED_RELAY_PORT=$(echo "$LOGS" | grep -oP 'Peer Relay enabled on UDP port \K[0-9]+' | tail -1)
+    DETECTED_IP=$(echo "$LOGS" | grep -oE '"HostName":"[^"]+"' | tail -1 | sed 's/"HostName":"//;s/"//')
+    DETECTED_DERP_PORT=$(echo "$LOGS" | grep -oE 'serving on :[0-9]+' | grep -oE '[0-9]+' | tail -1)
+    DETECTED_STUN_PORT=$(echo "$LOGS" | grep -oE 'STUN server listening on[^:]*:[0-9]+' | grep -oE '[0-9]+$' | tail -1)
+    DETECTED_RELAY_PORT=$(echo "$LOGS" | grep -oE 'Peer Relay enabled on UDP port [0-9]+' | grep -oE '[0-9]+$' | tail -1)
 
     if [ -n "$RAW_HASH" ]; then
         FOUND_CERT="$RAW_HASH"
